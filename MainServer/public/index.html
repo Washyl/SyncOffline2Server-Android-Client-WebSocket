@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Status</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        nav {
+            margin-bottom: 20px;
+        }
+        nav a {
+            margin-right: 20px;
+        }
+        .hidden {
+            display: none;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+        #notification {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background-color: #f0ad4e;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="#" onclick="showPage('home')">Home</a>
+        <a href="#" onclick="showPage('history')">History</a>
+    </nav>
+
+    <div id="home-page">
+        <h1>Network Status</h1>
+        <p id="current-status">Loading...</p>
+    </div>
+
+    <div id="history-page" class="hidden">
+        <h2>Status History</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Date Time</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                    <th>Resolve Date</th>
+                </tr>
+            </thead>
+            <tbody id="status-history">
+            </tbody>
+        </table>
+        <div>
+            <button onclick="prevPage()">Previous</button>
+            <span id="page-info"></span>
+            <button onclick="nextPage()">Next</button>
+        </div>
+    </div>
+
+    <div id="notification"></div>
+
+    <audio id="beep-sound" src="beep.mp3" preload="auto"></audio>
+
+    <script>
+        let currentPage = 1;
+        const itemsPerPage = 10;
+        let lastStatus = null;
+
+        function showPage(page) {
+            document.getElementById('home-page').classList.add('hidden');
+            document.getElementById('history-page').classList.add('hidden');
+            if (page === 'home') {
+                document.getElementById('home-page').classList.remove('hidden');
+                fetchStatus();
+            } else if (page === 'history') {
+                document.getElementById('history-page').classList.remove('hidden');
+                fetchHistory(currentPage);
+            }
+        }
+
+        function showNotification(message) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.style.display = 'block';
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 5000);
+        }
+
+        function playBeep() {
+            const beepSound = document.getElementById('beep-sound');
+            beepSound.play();
+        }
+
+        async function fetchStatus() {
+            try {
+                const response = await fetch('/status');
+                const data = await response.json();
+                const newStatus = data.status;
+                document.getElementById('current-status').textContent = `Current Status: ${newStatus}`;
+                if (lastStatus && lastStatus !== newStatus) {
+                    showNotification(`Network status changed: ${newStatus}`);
+                    if (newStatus === 'disconnected') {
+                        playBeep();
+                    }
+                }
+                lastStatus = newStatus;
+            } catch (error) {
+                console.error('Error fetching status:', error);
+            }
+        }
+
+        async function fetchHistory(page) {
+            try {
+                const response = await fetch(`/history?page=${page}&limit=${itemsPerPage}`);
+                const data = await response.json();
+                const tbody = document.getElementById('status-history');
+                tbody.innerHTML = '';
+                data.results.forEach(record => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${record.id}</td>
+                        <td>${record.date_time}</td>
+                        <td>${record.status}</td>
+                        <td>${record.action}</td>
+                        <td>${record.resolve_date || ''}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+                document.getElementById('page-info').textContent = `Page ${page} of ${data.totalPages}`;
+            } catch (error) {
+                console.error('Error fetching history:', error);
+            }
+        }
+
+        function nextPage() {
+            currentPage++;
+            fetchHistory(currentPage);
+        }
+
+        function prevPage() {
+            if (currentPage > 1) {
+                currentPage--;
+                fetchHistory(currentPage);
+            }
+        }
+
+        showPage('home');
+        setInterval(fetchStatus, 60000); // Update status every minute
+    </script>
+</body>
+</html>

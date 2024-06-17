@@ -1,0 +1,1 @@
+Please change the IP address in the mainactivty and network_security_config
